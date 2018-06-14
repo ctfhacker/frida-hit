@@ -1,0 +1,9 @@
+[package]
+name = "frida-hit"
+version = "0.1.0"
+authors = ["thebarbershopper <cld251@gmail.com>"]
+
+[dependencies]
+nom = "3.2.1"
+clap = "2.31.2"
+

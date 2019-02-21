@@ -1,4 +1,4 @@
-#![recursion_limit="128"]
+#![recursion_limit="256"]
 
 #[macro_use]
 extern crate nom;
@@ -69,25 +69,30 @@ fn get_function_signatures(filename: &str) -> Result<Vec<String>, io::Error> {
     let file = File::open(filename)?; 
 
     let mut data = String::new();
+    println!("Reading from BufReader");
     let length = BufReader::new(file).read_to_string(&mut data)?;
 
-    println!("size: {}", data.len());
 
     let functions = data.split("Function declarations")
                         .collect::<Vec<&str>>()[1]
                         .split("Data declarations")
                         .collect::<Vec<&str>>()[0]
-                        .split("\r\n")
+                        .split("\n")
                         .map(String::from)
                         .collect::<Vec<String>>();
+
+    println!("functions.len: {}", functions.len());
+
+    /*
     for f in &functions {
         println!("{}", f);
     }
+    */
 
     Ok(functions)
 }
 
-fn main() {
+fn main() -> Result<(), io::Error> {
     let matches = App::new("Hit Tracer powered by Frida")
                        .arg(Arg::with_name("INPUT_FILE")
                                 .help("C File produced by Hex Rays for your current module")
@@ -101,15 +106,15 @@ fn main() {
     let hex_rays_c = matches.value_of("INPUT_FILE").expect("Please provide input .c file");
     let binary_name = matches.value_of("BINARY_NAME").expect("Please provide binary name");
 
-    let functions = get_function_signatures(hex_rays_c).ok().unwrap();
+    let functions = get_function_signatures(hex_rays_c)?;
 
     let mut file_data: Vec<String> = vec!(String::from(format!("var base = parseInt(Module.findBaseAddress('{}'));", binary_name)));
 
     for f in functions {
         let res = parse_function(&f);
         if res.is_err() {
-            println!("{}", f);
-            println!("{:?}", res);
+            println!("ERROR: {}", f);
+            println!("-->:  {:?}", res);
         }
 
         match res {
@@ -130,7 +135,6 @@ fn main() {
                         self_args.join("\n        ")
                     },
                 };
-
 
                 match i64::from_str_radix(&func.name.replace("sub_", ""), 16) {
                     Ok(num) =>  {
@@ -174,7 +178,6 @@ Interceptor.attach(ptr(parseInt(DebugSymbol.fromName('{func_name}')['address']))
 ", func_name=func.name, arguments=frida_arguments, self_args=self_args, return_type=func.return_type);
 
                         file_data.push(curr_file_data);
-
                     }
                 };
             },
@@ -196,6 +199,8 @@ Interceptor.attach(ptr(parseInt(DebugSymbol.fromName('{func_name}')['address']))
             // println!("successfully wrote to {}", filepath),
         }
     }
+
+    Ok(())
 }
 
 
@@ -237,8 +242,9 @@ named!(get_type<&str, &str>,
             tag!("const struct std::locale *") | tag!("const struct std::_Locinfo *")  |
             tag!("PSID") | tag!("LPHANDLER_FUNCTION") | tag!("SERVICE_STATUS_HANDLE") | tag!("struct _EXCEPTION_POINTERS") |
             tag!("__int16") | tag!("__int32") | tag!("__int64") | tag!("...") | tag!("HINSTANCE") |
-            tag!("unsigned __int8 *") | tag!("unsigned __int8") | tag!("unsigned __int16 *") | tag!("unsigned __int16") |
-            tag!("wchar_t *") | tag!("wchar_t")
+            tag!("unsigned __int8 *") | tag!("unsigned __int8") | tag!("unsigned __int16 *") | tag!("unsigned __int16") | tag!("unsigned __int32") | tag!("unsigned __int32 *") | tag!("unsigned __int64") | tag!("unsigned __int64 *") |
+            tag!("signed __int8 *") | tag!("signed __int8") | tag!("signed __int16 *") | tag!("signed __int16") | tag!("signed __int32") | tag!("signed __int32 *") | tag!("signed __int64") | tag!("signed __int64 *") |
+            tag!("wchar_t *") | tag!("wchar_t") 
         )
 );
 
